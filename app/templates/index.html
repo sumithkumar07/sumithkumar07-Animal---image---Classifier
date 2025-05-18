@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Classifier</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .prediction-bar {
+            height: 30px;
+            background-color: #007bff;
+            transition: width 0.5s ease-in-out;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+            background-color: #f8f9fa;
+        }
+        
+        .upload-area:hover {
+            border-color: #007bff;
+            background-color: #e9ecef;
+        }
+        
+        .upload-area.dragover {
+            border-color: #28a745;
+            background-color: #e9ecef;
+            transform: scale(1.02);
+        }
+        
+        .prediction-container {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            display: none;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+
+        .progress-bar {
+            transition: width 0.6s ease;
+            border-radius: 4px;
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .supported-formats {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+
+        .prediction-item {
+            transition: all 0.3s ease;
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .top-prediction {
+            background-color: rgba(0, 123, 255, 0.1);
+            border: 1px solid rgba(0, 123, 255, 0.2);
+        }
+
+        .confidence-success { color: #28a745; }
+        .confidence-primary { color: #007bff; }
+        .confidence-warning { color: #ffc107; }
+        .confidence-danger { color: #dc3545; }
+
+        .progress {
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            transition: width 0.6s ease;
+        }
+
+        .bg-success { background-color: #28a745 !important; }
+        .bg-primary { background-color: #007bff !important; }
+        .bg-warning { background-color: #ffc107 !important; }
+        .bg-danger { background-color: #dc3545 !important; }
+
+        .error-message {
+            color: #dc3545;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            font-weight: 500;
+        }
+
+        .loading {
+            padding: 20px;
+            text-align: center;
+            background-color: rgba(0, 123, 255, 0.1);
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="text-center mb-4">Animal Classifier</h1>
+        
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="upload-area" id="uploadArea">
+                            <div class="mb-3">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-primary"></i>
+                                <h4 class="mt-3">Drag and drop an image here</h4>
+                                <p class="text-muted">or</p>
+                                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                    Choose File
+                                </button>
+                                <p class="supported-formats mt-2">
+                                    Supported formats: PNG, JPG, JPEG, GIF, BMP, WebP, TIFF
+                                </p>
+                                <p class="file-info" id="fileInfo"></p>
+                            </div>
+                            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                        </div>
+                        
+                        <div id="imagePreview" class="text-center">
+                            <img id="preview" class="preview-image" style="display: none;">
+                        </div>
+                        
+                        <div id="loading" class="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Analyzing image...</p>
+                        </div>
+                        
+                        <div id="error" class="error-message"></div>
+                        
+                        <div id="predictions" class="prediction-container">
+                            <h4 class="mb-3">Predictions:</h4>
+                            <div id="predictionResults"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
+    <script>
+        // Initialize DOM elements with validation
+        const elements = {
+            uploadArea: document.getElementById('uploadArea'),
+            fileInput: document.getElementById('fileInput'),
+            preview: document.getElementById('preview'),
+            loading: document.getElementById('loading'),
+            predictions: document.getElementById('predictions'),
+            predictionResults: document.getElementById('predictionResults'),
+            errorElement: document.getElementById('error'),
+            fileInfo: document.getElementById('fileInfo')
+        };
+
+        // Validate all required elements exist
+        Object.entries(elements).forEach(([name, element]) => {
+            if (!element) {
+                console.error(`Required element "${name}" not found in the DOM`);
+            }
+        });
+
+        // Safe element display setter
+        function setElementDisplay(element, value) {
+            if (element && typeof element.style !== 'undefined') {
+                element.style.display = value;
+            }
+        }
+
+        // Drag and drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            elements.uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            elements.uploadArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            elements.uploadArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            elements.uploadArea.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            elements.uploadArea.classList.remove('dragover');
+        }
+
+        elements.uploadArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        elements.fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showError(message) {
+            setElementDisplay(elements.errorElement, 'block');
+            if (elements.errorElement) {
+                elements.errorElement.textContent = message;
+            }
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            
+            // Update file info
+            if (elements.fileInfo) {
+                elements.fileInfo.textContent = `${file.name} (${formatFileSize(file.size)})`;
+            }
+            
+            // Reset previous state
+            setElementDisplay(elements.errorElement, 'none');
+            setElementDisplay(elements.predictions, 'none');
+            
+            if (!file.type.startsWith('image/')) {
+                showError('Please upload an image file.');
+                setElementDisplay(elements.preview, 'none');
+                return;
+            }
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (elements.preview) {
+                    elements.preview.src = e.target.result;
+                    setElementDisplay(elements.preview, 'block');
+                }
+                
+                // Create a temporary image to check dimensions
+                const img = new Image();
+                img.onload = function() {
+                    if (img.width < 10 || img.height < 10) {
+                        showError('Image dimensions too small (minimum 10x10 pixels)');
+                        return;
+                    }
+                    if (img.width > 4096 || img.height > 4096) {
+                        showError('Image dimensions too large (maximum 4096x4096 pixels)');
+                        return;
+                    }
+                    // If dimensions are okay, proceed with upload
+                    uploadImage(file);
+                };
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function uploadImage(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Reset and show loading
+            setElementDisplay(elements.errorElement, 'none');
+            setElementDisplay(elements.predictions, 'none');
+            setElementDisplay(elements.loading, 'block');
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 413) {
+                        throw new Error('File size too large (maximum 15MB)');
+                    }
+                    throw new Error(`Server error (${response.status})`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                setElementDisplay(elements.loading, 'none');
+                if (data.error) {
+                    showError(data.error);
+                } else if (!data.predictions || data.predictions.length === 0) {
+                    showError('No predictions returned. Please try a different image.');
+                } else {
+                    // Clear any previous errors
+                    setElementDisplay(elements.errorElement, 'none');
+                    showPredictions(data.predictions);
+                }
+            })
+            .catch(error => {
+                setElementDisplay(elements.loading, 'none');
+                console.error('Error:', error);
+                if (error.name === 'TypeError' && !navigator.onLine) {
+                    showError('Network connection lost. Please check your internet connection and try again.');
+                } else if (error.name === 'AbortError') {
+                    showError('Request timed out. Please try again.');
+                } else {
+                    showError(error.message || 'Network error or server unavailable. Please try again.');
+                }
+            });
+        }
+
+        function showPredictions(predictions) {
+            if (!elements.predictionResults || !elements.predictions) return;
+            
+            elements.predictionResults.innerHTML = '';
+            predictions.sort((a, b) => b.probability - a.probability);
+            
+            predictions.forEach((pred, index) => {
+                const probability = (pred.probability * 100).toFixed(2);
+                const confidence = getConfidenceClass(probability);
+                
+                const html = `
+                    <div class="mb-3 prediction-item ${index === 0 ? 'top-prediction' : ''}">
+                        <div class="d-flex justify-content-between mb-1">
+                            <strong>${pred.class}</strong>
+                            <span class="confidence-${confidence}">${probability}%</span>
+                        </div>
+                        <div class="progress" style="height: 20px;">
+                            <div class="progress-bar bg-${confidence}" role="progressbar" 
+                                 style="width: ${probability}%" 
+                                 aria-valuenow="${probability}" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>`;
+                elements.predictionResults.innerHTML += html;
+            });
+            
+            setElementDisplay(elements.predictions, 'block');
+            
+            // Scroll to predictions
+            elements.predictionResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function getConfidenceClass(probability) {
+            if (probability >= 90) return 'success';
+            if (probability >= 70) return 'primary';
+            if (probability >= 40) return 'warning';
+            return 'danger';
+        }
+    </script>
+</body>
+</html> 
