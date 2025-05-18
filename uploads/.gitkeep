@@ -1,9 +1,0 @@
-def create_augmentation_pipeline():
-    return A.Compose([
-        A.RandomRotate90(p=0.5),
-        A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.Transpose(p=0.5),
-        # ... other augmentations ...
-        A.Resize(224, 224)
-    ]) 
